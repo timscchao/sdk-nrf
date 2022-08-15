@@ -240,6 +240,10 @@ Libraries for networking
 
 |no_changes_yet_note|
 
+* :ref:`lib_download_client` library:
+
+  * Updated the library so that it does not retry download on disconnect.
+
 Libraries for NFC
 -----------------
 
