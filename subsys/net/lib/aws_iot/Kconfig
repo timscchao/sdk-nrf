@@ -45,8 +45,16 @@ config AWS_IOT_STATIC_IPV4_ADDR
 config AWS_IOT_SEC_TAG
 	int "Security tag to use for AWS IoT connection"
 
+config AWS_IOT_SEC_TAG_LIST_COUNT
+	int "Maximum number of secutity tags support to use for AWS IoT connection"
+	default 3
+
 config AWS_IOT_BROKER_HOST_NAME
 	string "AWS IoT server hostname"
+	default ""
+
+config AWS_IOT_BROKER_HOST_NAME_APP
+	bool "Broker name provided by application run-time"
 
 config AWS_IOT_PORT
 	int "AWS server port"
@@ -70,9 +78,17 @@ config AWS_IOT_APP_SUBSCRIPTION_LIST_COUNT
 	int "Amount of entries in the application subscription list"
 	default 0
 
+config AWS_IOT_BROKER_HOST_NAME_MAX_LEN
+	int "Maximum length of broker name"
+	default 64
+
 config AWS_IOT_CLIENT_ID_MAX_LEN
 	int "Maximum length of cliend id"
 	default 30
+
+config AWS_IOT_SHADOW_NAME_MAX_LEN
+	int "Maximum length of device shadow name"
+	default 64
 
 config AWS_IOT_PROVISION_CERTIFICATES
 	bool "Run-time provisioning of certificates"
@@ -99,6 +115,13 @@ config AWS_IOT_CLIENT_ID_STATIC
 
 config AWS_IOT_CLIENT_ID_APP
 	bool "Client ID provided by application run-time"
+
+config AWS_IOT_SHADOW_NAME_STATIC
+	string "Static device shadow name (empty for classic shadow)"
+	default ""
+
+config AWS_IOT_SHADOW_NAME_APP
+	bool "Device shadow name provided by application run-time"
 
 config AWS_IOT_AUTO_DEVICE_SHADOW_REQUEST
 	bool "Request the device shadow automatically upon a connection to AWS"

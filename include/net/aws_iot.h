@@ -180,6 +180,14 @@ typedef void (*aws_iot_evt_handler_t)(const struct aws_iot_evt *evt);
 struct aws_iot_config {
 	/** Socket for AWS IoT broker connection */
 	int socket;
+	/**
+	 * 	Broker host name (endpoint) for AWS IoT, used whe
+	 *  @kconfig{CONFIG_AWS_IOT_BROKER_HOST_NAME_APP} is set. If not set an
+	 *  internal configurable static host name is used.
+	 */
+	char *broker_host;
+	/** Length of broker_host string. */
+	size_t broker_host_len;
 	/** Client id for AWS IoT broker connection, used when
 	 *  @kconfig{CONFIG_AWS_IOT_CLIENT_ID_APP} is set. If not set an internal
 	 *  configurable static client id is used.
@@ -187,6 +195,23 @@ struct aws_iot_config {
 	char *client_id;
 	/** Length of client_id string. */
 	size_t client_id_len;
+	/** Shadow name for AWS IoT named shadow, used when
+	 *  @kconfig{CONFIG_AWS_IOT_SHADOW_NAME_APP} is set. If not set an internal
+	 *  configurable static shadown name is used.
+	 */
+	char *shadow_name;
+	/** Length of shadow_name string. */
+	size_t shadow_name_len;
+	/** Security tags for AWS IoT connection.
+	 *  If not set, an internal configurable static security tag is used.
+	 */
+	sec_tag_t *sec_tag_list;
+	/** Tag count of sec_tag_list */
+	uint32_t sec_tag_count;
+	/** Pointer to hold MQTT keepalive (in seconds) value.
+	 *  If not set, the @kconfig{CONFIG_MQTT_KEEPALIVE} is used.
+	 */
+	uint16_t *keepalive;
 };
 
 /** @brief Initialize the module.
