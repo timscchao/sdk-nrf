@@ -41,7 +41,7 @@ struct bond_find_data {
 
 static struct bt_conn *active_conn[CONFIG_BT_MAX_CONN];
 
-
+#ifdef CONFIG_BT_SMP
 static void bond_find(const struct bt_bond_info *info, void *user_data)
 {
 	struct bond_find_data *bond_find_data = user_data;
@@ -53,6 +53,7 @@ static void bond_find(const struct bt_bond_info *info, void *user_data)
 	__ASSERT_NO_MSG(bond_find_data->peer_count < UCHAR_MAX);
 	bond_find_data->peer_count++;
 }
+#endif
 
 static void disconnect_peer(struct bt_conn *conn)
 {
@@ -187,6 +188,7 @@ static void connected(struct bt_conn *conn, uint8_t error)
 		goto disconnect;
 	}
 
+#ifdef CONFIG_BT_SMP
 	if (IS_ENABLED(CONFIG_BT_PERIPHERAL) &&
 	    (info.role == BT_CONN_ROLE_PERIPHERAL)) {
 		struct bond_find_data bond_find_data = {
@@ -217,6 +219,7 @@ static void connected(struct bt_conn *conn, uint8_t error)
 			goto disconnect;
 		}
 	}
+#endif
 
 	return;
 
@@ -253,6 +256,8 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 	event->state = PEER_STATE_DISCONNECTED;
 	APP_EVENT_SUBMIT(event);
 }
+
+#if defined(CONFIG_BT_SMP) || defined(CONFIG_BT_BREDR)
 
 static struct bt_gatt_exchange_params exchange_params;
 
@@ -299,6 +304,8 @@ static void security_changed(struct bt_conn *conn, bt_security_t level,
 		}
 	}
 }
+
+#endif
 
 static bool le_param_req(struct bt_conn *conn, struct bt_le_conn_param *param)
 {
@@ -370,7 +377,9 @@ static int ble_state_init(void)
 	static struct bt_conn_cb conn_callbacks = {
 		.connected = connected,
 		.disconnected = disconnected,
+#if defined(CONFIG_BT_SMP) || defined(CONFIG_BT_BREDR)
 		.security_changed = security_changed,
+#endif
 		.le_param_req = le_param_req,
 		.le_param_updated = le_param_updated,
 	};
