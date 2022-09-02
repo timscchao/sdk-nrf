@@ -32,6 +32,13 @@ BUILD_ASSERT(CONFIG_AWS_IOT_CLIENT_ID_MAX_LEN >=
 	     "Increase CONFIG_AWS_IOT_CLIENT_ID_MAX_LEN");
 #endif /* !defined(CONFIG_AWS_IOT_CLIENT_ID_APP */
 
+#if !defined(CONFIG_AWS_IOT_SHADOW_NAME_APP)
+BUILD_ASSERT(CONFIG_AWS_IOT_SHADOW_NAME_MAX_LEN >=
+	     sizeof(CONFIG_AWS_IOT_SHADOW_NAME_STATIC) - 1,
+	     "AWS IoT device shadown name static buffer to small "
+	     "Increase CONFIG_AWS_IOT_SHADOW_NAME_MAX_LEN");
+#endif /* !defined(CONFIG_AWS_IOT_SHADOW_NAME_APP) */
+
 #if defined(CONFIG_AWS_IOT_IPV6)
 #define AWS_AF_FAMILY AF_INET6
 #else
@@ -44,59 +51,63 @@ BUILD_ASSERT(CONFIG_AWS_IOT_CLIENT_ID_MAX_LEN >=
 #define AWS_CLIENT_ID_PREFIX "%s"
 #define AWS_CLIENT_ID_LEN_MAX CONFIG_AWS_IOT_CLIENT_ID_MAX_LEN
 
-#define GET_TOPIC AWS_TOPIC "%s/shadow/get"
-#define GET_TOPIC_LEN (AWS_TOPIC_LEN + AWS_CLIENT_ID_LEN_MAX + 11)
+#define AWS_SHADOW_NAME "/name/%s"
+#define AWS_SHADOW_NAME_LEN_MAX (CONFIG_AWS_IOT_SHADOW_NAME_MAX_LEN + 6)
 
-#define UPDATE_TOPIC AWS_TOPIC "%s/shadow/update"
-#define UPDATE_TOPIC_LEN (AWS_TOPIC_LEN + AWS_CLIENT_ID_LEN_MAX + 14)
+#define GET_TOPIC AWS_TOPIC "%s/shadow%s/get"
+#define GET_TOPIC_LEN (AWS_TOPIC_LEN + AWS_CLIENT_ID_LEN_MAX + AWS_SHADOW_NAME_LEN_MAX + 11)
 
-#define DELETE_TOPIC AWS_TOPIC "%s/shadow/delete"
-#define DELETE_TOPIC_LEN (AWS_TOPIC_LEN + AWS_CLIENT_ID_LEN_MAX + 14)
+#define UPDATE_TOPIC AWS_TOPIC "%s/shadow%s/update"
+#define UPDATE_TOPIC_LEN (AWS_TOPIC_LEN + AWS_CLIENT_ID_LEN_MAX + AWS_SHADOW_NAME_LEN_MAX + 14)
+
+#define DELETE_TOPIC AWS_TOPIC "%s/shadow%s/delete"
+#define DELETE_TOPIC_LEN (AWS_TOPIC_LEN + AWS_CLIENT_ID_LEN_MAX + AWS_SHADOW_NAME_LEN_MAX + 14)
 
 static char client_id_buf[AWS_CLIENT_ID_LEN_MAX + 1];
+static char shadow_name_buf[AWS_SHADOW_NAME_LEN_MAX + 1];
 static char get_topic[GET_TOPIC_LEN + 1];
 static char update_topic[UPDATE_TOPIC_LEN + 1];
 static char delete_topic[DELETE_TOPIC_LEN + 1];
 
 #if defined(CONFIG_AWS_IOT_TOPIC_UPDATE_ACCEPTED_SUBSCRIBE)
-#define UPDATE_ACCEPTED_TOPIC AWS_TOPIC "%s/shadow/update/accepted"
-#define UPDATE_ACCEPTED_TOPIC_LEN (AWS_TOPIC_LEN + AWS_CLIENT_ID_LEN_MAX + 23)
+#define UPDATE_ACCEPTED_TOPIC AWS_TOPIC "%s/shadow%s/update/accepted"
+#define UPDATE_ACCEPTED_TOPIC_LEN (AWS_TOPIC_LEN + AWS_CLIENT_ID_LEN_MAX + AWS_SHADOW_NAME_LEN_MAX + 23)
 static char update_accepted_topic[UPDATE_ACCEPTED_TOPIC_LEN + 1];
 #endif
 
 #if defined(CONFIG_AWS_IOT_TOPIC_UPDATE_REJECTED_SUBSCRIBE)
-#define UPDATE_REJECTED_TOPIC AWS_TOPIC "%s/shadow/update/rejected"
-#define UPDATE_REJECTED_TOPIC_LEN (AWS_TOPIC_LEN + AWS_CLIENT_ID_LEN_MAX + 23)
+#define UPDATE_REJECTED_TOPIC AWS_TOPIC "%s/shadow%s/update/rejected"
+#define UPDATE_REJECTED_TOPIC_LEN (AWS_TOPIC_LEN + AWS_CLIENT_ID_LEN_MAX + AWS_SHADOW_NAME_LEN_MAX + 23)
 static char update_rejected_topic[UPDATE_REJECTED_TOPIC_LEN + 1];
 #endif
 
 #if defined(CONFIG_AWS_IOT_TOPIC_UPDATE_DELTA_SUBSCRIBE)
-#define UPDATE_DELTA_TOPIC AWS_TOPIC "%s/shadow/update/delta"
-#define UPDATE_DELTA_TOPIC_LEN (AWS_TOPIC_LEN + AWS_CLIENT_ID_LEN_MAX + 20)
+#define UPDATE_DELTA_TOPIC AWS_TOPIC "%s/shadow%s/update/delta"
+#define UPDATE_DELTA_TOPIC_LEN (AWS_TOPIC_LEN + AWS_CLIENT_ID_LEN_MAX + AWS_SHADOW_NAME_LEN_MAX + 20)
 static char update_delta_topic[UPDATE_DELTA_TOPIC_LEN + 1];
 #endif
 
 #if defined(CONFIG_AWS_IOT_TOPIC_GET_ACCEPTED_SUBSCRIBE)
-#define GET_ACCEPTED_TOPIC AWS_TOPIC "%s/shadow/get/accepted"
-#define GET_ACCEPTED_TOPIC_LEN (AWS_TOPIC_LEN + AWS_CLIENT_ID_LEN_MAX + 20)
+#define GET_ACCEPTED_TOPIC AWS_TOPIC "%s/shadow%s/get/accepted"
+#define GET_ACCEPTED_TOPIC_LEN (AWS_TOPIC_LEN + AWS_CLIENT_ID_LEN_MAX + AWS_SHADOW_NAME_LEN_MAX + 20)
 static char get_accepted_topic[GET_ACCEPTED_TOPIC_LEN + 1];
 #endif
 
 #if defined(CONFIG_AWS_IOT_TOPIC_GET_REJECTED_SUBSCRIBE)
-#define GET_REJECTED_TOPIC AWS_TOPIC "%s/shadow/get/rejected"
-#define GET_REJECTED_TOPIC_LEN (AWS_TOPIC_LEN + AWS_CLIENT_ID_LEN_MAX + 20)
+#define GET_REJECTED_TOPIC AWS_TOPIC "%s/shadow%s/get/rejected"
+#define GET_REJECTED_TOPIC_LEN (AWS_TOPIC_LEN + AWS_CLIENT_ID_LEN_MAX + AWS_SHADOW_NAME_LEN_MAX + 20)
 static char get_rejected_topic[GET_REJECTED_TOPIC_LEN + 1];
 #endif
 
 #if defined(CONFIG_AWS_IOT_TOPIC_DELETE_ACCEPTED_SUBSCRIBE)
-#define DELETE_ACCEPTED_TOPIC AWS_TOPIC "%s/shadow/delete/accepted"
-#define DELETE_ACCEPTED_TOPIC_LEN (AWS_TOPIC_LEN + AWS_CLIENT_ID_LEN_MAX + 23)
+#define DELETE_ACCEPTED_TOPIC AWS_TOPIC "%s/shadow%s/delete/accepted"
+#define DELETE_ACCEPTED_TOPIC_LEN (AWS_TOPIC_LEN + AWS_CLIENT_ID_LEN_MAX + AWS_SHADOW_NAME_LEN_MAX + 23)
 static char delete_accepted_topic[DELETE_ACCEPTED_TOPIC_LEN + 1];
 #endif
 
 #if defined(CONFIG_AWS_IOT_TOPIC_DELETE_REJECTED_SUBSCRIBE)
-#define DELETE_REJECTED_TOPIC AWS_TOPIC "%s/shadow/delete/rejected"
-#define DELETE_REJECTED_TOPIC_LEN (AWS_TOPIC_LEN + AWS_CLIENT_ID_LEN_MAX + 23)
+#define DELETE_REJECTED_TOPIC AWS_TOPIC "%s/shadow%s/delete/rejected"
+#define DELETE_REJECTED_TOPIC_LEN (AWS_TOPIC_LEN + AWS_CLIENT_ID_LEN_MAX + AWS_SHADOW_NAME_LEN_MAX + 23)
 static char delete_rejected_topic[DELETE_REJECTED_TOPIC_LEN + 1];
 #endif
 
@@ -216,7 +227,8 @@ static void aws_fota_cb_handler(struct aws_fota_event *fota_evt)
 }
 #endif
 
-static int aws_iot_topics_populate(char *const id, size_t id_len)
+static int aws_iot_topics_populate(
+	char *const id, size_t id_len, char *const shadow, size_t shadow_len)
 {
 	int err;
 #if defined(CONFIG_AWS_IOT_CLIENT_ID_APP)
@@ -238,69 +250,93 @@ static int aws_iot_topics_populate(char *const id, size_t id_len)
 		return -ENOMEM;
 	}
 #endif
+	memset(shadow_name_buf, 0, sizeof(shadow_name_buf));
+#if defined(CONFIG_AWS_IOT_SHADOW_NAME_APP)
+	if (shadow_len > 0) {
+		err = snprintf(shadow_name_buf, sizeof(shadow_name_buf),
+			       AWS_SHADOW_NAME, shadow);
+		if (err <= 0) {
+			return -EINVAL;
+		}
+		if (err >= sizeof(shadow_name_buf)) {
+			return -ENOMEM;
+		}
+	}
+#else
+	if (strlen(CONFIG_AWS_IOT_SHADOW_NAME_STATIC) > 0) {
+		err = snprintf(shadow_name_buf, sizeof(shadow_name_buf),
+			       AWS_SHADOW_NAME, CONFIG_AWS_IOT_SHADOW_NAME_STATIC);
+		if (err <= 0) {
+			return -EINVAL;
+		}
+		if (err >= sizeof(shadow_name_buf)) {
+			return -ENOMEM;
+		}
+	}
+#endif
 	err = snprintf(get_topic, sizeof(get_topic),
-		       GET_TOPIC, client_id_buf);
+		       GET_TOPIC, client_id_buf, shadow_name_buf);
 	if (err >= GET_TOPIC_LEN) {
 		return -ENOMEM;
 	}
 
 	err = snprintf(update_topic, sizeof(update_topic),
-		       UPDATE_TOPIC, client_id_buf);
+		       UPDATE_TOPIC, client_id_buf, shadow_name_buf);
 	if (err >= UPDATE_TOPIC_LEN) {
 		return -ENOMEM;
 	}
 
 	err = snprintf(delete_topic, sizeof(delete_topic),
-		       DELETE_TOPIC, client_id_buf);
+		       DELETE_TOPIC, client_id_buf, shadow_name_buf);
 	if (err >= DELETE_TOPIC_LEN) {
 		return -ENOMEM;
 	}
 
 #if defined(CONFIG_AWS_IOT_TOPIC_GET_ACCEPTED_SUBSCRIBE)
 	err = snprintf(get_accepted_topic, sizeof(get_accepted_topic),
-		       GET_ACCEPTED_TOPIC, client_id_buf);
+		       GET_ACCEPTED_TOPIC, client_id_buf, shadow_name_buf);
 	if (err >= GET_ACCEPTED_TOPIC_LEN) {
 		return -ENOMEM;
 	}
 #endif
 #if defined(CONFIG_AWS_IOT_TOPIC_GET_REJECTED_SUBSCRIBE)
 	err = snprintf(get_rejected_topic, sizeof(get_rejected_topic),
-		       GET_REJECTED_TOPIC, client_id_buf);
+		       GET_REJECTED_TOPIC, client_id_buf, shadow_name_buf);
 	if (err >= GET_REJECTED_TOPIC_LEN) {
 		return -ENOMEM;
 	}
 #endif
 #if defined(CONFIG_AWS_IOT_TOPIC_UPDATE_ACCEPTED_SUBSCRIBE)
 	err = snprintf(update_accepted_topic, sizeof(update_accepted_topic),
-		       UPDATE_ACCEPTED_TOPIC, client_id_buf);
+		       UPDATE_ACCEPTED_TOPIC, client_id_buf, shadow_name_buf);
 	if (err >= UPDATE_ACCEPTED_TOPIC_LEN) {
 		return -ENOMEM;
 	}
 #endif
 #if defined(CONFIG_AWS_IOT_TOPIC_UPDATE_REJECTED_SUBSCRIBE)
 	err = snprintf(update_rejected_topic, sizeof(update_rejected_topic),
-		       UPDATE_REJECTED_TOPIC, client_id_buf);
+		       UPDATE_REJECTED_TOPIC, client_id_buf, shadow_name_buf);
 	if (err >= UPDATE_REJECTED_TOPIC_LEN) {
 		return -ENOMEM;
 	}
 #endif
 #if defined(CONFIG_AWS_IOT_TOPIC_UPDATE_DELTA_SUBSCRIBE)
 	err = snprintf(update_delta_topic, sizeof(update_delta_topic),
-		       UPDATE_DELTA_TOPIC, client_id_buf);
+		       UPDATE_DELTA_TOPIC, client_id_buf, shadow_name_buf);
 	if (err >= UPDATE_DELTA_TOPIC_LEN) {
 		return -ENOMEM;
 	}
 #endif
 #if defined(CONFIG_AWS_IOT_TOPIC_DELETE_ACCEPTED_SUBSCRIBE)
 	err = snprintf(delete_accepted_topic, sizeof(delete_accepted_topic),
-		       DELETE_ACCEPTED_TOPIC, client_id_buf);
+		       DELETE_ACCEPTED_TOPIC, client_id_buf, shadow_name_buf);
 	if (err >= DELETE_ACCEPTED_TOPIC_LEN) {
 		return -ENOMEM;
 	}
 #endif
 #if defined(CONFIG_AWS_IOT_TOPIC_DELETE_REJECTED_SUBSCRIBE)
 	err = snprintf(delete_rejected_topic, sizeof(delete_rejected_topic),
-		       DELETE_REJECTED_TOPIC, client_id_buf);
+		       DELETE_REJECTED_TOPIC, client_id_buf, shadow_name_buf);
 	if (err >= DELETE_REJECTED_TOPIC_LEN) {
 		return -ENOMEM;
 	}
@@ -1062,8 +1098,8 @@ int aws_iot_init(const struct aws_iot_config *const config,
 {
 	int err;
 
-	if (IS_ENABLED(CONFIG_AWS_IOT_CLIENT_ID_APP) &&
-		config == NULL) {
+	if ((IS_ENABLED(CONFIG_AWS_IOT_CLIENT_ID_APP) || IS_ENABLED(CONFIG_AWS_IOT_SHADOW_NAME_APP)) &&
+	    config == NULL) {
 		LOG_ERR("config is NULL");
 		return -EINVAL;
 	}
@@ -1074,16 +1110,28 @@ int aws_iot_init(const struct aws_iot_config *const config,
 		return -EMSGSIZE;
 	}
 
+	if (IS_ENABLED(CONFIG_AWS_IOT_SHADOW_NAME_APP) &&
+	    config->shadow_name_len >= CONFIG_AWS_IOT_SHADOW_NAME_MAX_LEN) {
+		LOG_ERR("Shadow name string too long");
+		return -EMSGSIZE;
+	}
+
 	if (IS_ENABLED(CONFIG_AWS_IOT_CLIENT_ID_APP) &&
 	    config->client_id == NULL) {
 		LOG_ERR("Client ID not set in the application");
 		return -ENODATA;
 	}
 
-	if (IS_ENABLED(CONFIG_AWS_IOT_CLIENT_ID_APP)) {
-		err = aws_iot_topics_populate(config->client_id, config->client_id_len);
+	if (IS_ENABLED(CONFIG_AWS_IOT_SHADOW_NAME_APP) &&
+	    config->shadow_name == NULL) {
+		LOG_ERR("Shadow name not set in the application");
+		return -ENODATA;
+	}
+
+	if (IS_ENABLED(CONFIG_AWS_IOT_CLIENT_ID_APP) || IS_ENABLED(CONFIG_AWS_IOT_SHADOW_NAME_APP)) {
+		err = aws_iot_topics_populate(config->client_id, config->client_id_len, config->shadow_name, config->shadown_name_len);
 	} else {
-		err = aws_iot_topics_populate(NULL, 0);
+		err = aws_iot_topics_populate(NULL, 0, NULL, 0);
 	}
 
 	if (err) {

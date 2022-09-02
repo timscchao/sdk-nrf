@@ -187,6 +187,13 @@ struct aws_iot_config {
 	char *client_id;
 	/** Length of client_id string. */
 	size_t client_id_len;
+	/** Shadow name for AWS IoT named shadow, used when
+	 *  @kconfig{CONFIG_AWS_IOT_SHADOW_NAME_APP} is set. If not set an internal
+	 *  configurable static shadown name is used.
+	 */
+	char *shadow_name;
+	/** Length of shadow_name string. */
+	size_t shadow_name_len;
 };
 
 /** @brief Initialize the module.
