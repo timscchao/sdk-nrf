@@ -202,6 +202,12 @@ struct aws_iot_config {
 	char *shadow_name;
 	/** Length of shadow_name string. */
 	size_t shadow_name_len;
+	/** Security tags for AWS IoT connection.
+	 *  If not set, an internal configurable static security tag is used.
+	 */
+	sec_tag_t *sec_tag_list;
+	/** Tag count of sec_tag_list */
+	uint32_t sec_tag_count;
 };
 
 /** @brief Initialize the module.

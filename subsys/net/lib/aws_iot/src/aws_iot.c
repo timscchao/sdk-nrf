@@ -117,6 +117,9 @@ static char delete_accepted_topic[DELETE_ACCEPTED_TOPIC_LEN + 1];
 static char delete_rejected_topic[DELETE_REJECTED_TOPIC_LEN + 1];
 #endif
 
+static sec_tag_t sec_tag_list[CONFIG_AWS_IOT_SEC_TAG_LIST_COUNT] = { CONFIG_AWS_IOT_SEC_TAG };
+static uint32_t sec_tag_count = 1;
+
 /* Empty string used to request the AWS IoT shadow document. */
 #define AWS_IOT_SHADOW_REQUEST_STRING ""
 
@@ -372,6 +375,21 @@ static int aws_iot_topics_populate(
 		return -ENOMEM;
 	}
 #endif
+	return 0;
+}
+
+static int aws_iot_sec_tag_list_populate(sec_tag_t *const list, size_t count)
+{
+	if (count > CONFIG_AWS_IOT_SEC_TAG_LIST_COUNT) {
+		LOG_ERR("Too many secutiry tag in list");
+		return -EMSGSIZE;
+	}
+
+	if (list != NULL && count > 0) {
+		memcpy(sec_tag_list, list, count * sizeof(sec_tag_t));
+		sec_tag_count = count;
+	}
+
 	return 0;
 }
 
@@ -905,13 +923,12 @@ static int client_broker_init(struct mqtt_client *const client)
 	client->will_message = &last_will_message;
 #endif
 
-	static sec_tag_t sec_tag_list[] = { CONFIG_AWS_IOT_SEC_TAG };
 	struct mqtt_sec_config *tls_cfg = &(client->transport).tls.config;
 
 	tls_cfg->peer_verify		= 2;
 	tls_cfg->cipher_count		= 0;
 	tls_cfg->cipher_list		= NULL;
-	tls_cfg->sec_tag_count		= ARRAY_SIZE(sec_tag_list);
+	tls_cfg->sec_tag_count		= sec_tag_count;
 	tls_cfg->sec_tag_list		= sec_tag_list;
 	tls_cfg->hostname		= endpoint_buf;
 	tls_cfg->session_cache = TLS_SESSION_CACHE_DISABLED;
@@ -1194,6 +1211,13 @@ int aws_iot_init(const struct aws_iot_config *const config,
 
 	if (err) {
 		LOG_ERR("aws_iot_endpoint_populate, error: %d", err);
+		return err;
+	}
+
+	err = aws_iot_sec_tag_list_populate(config->sec_tag_list, config->sec_tag_count);
+
+	if (err) {
+		LOG_ERR("aws_iot_sec_tag_list_populate, error: %d", err);
 		return err;
 	}
 

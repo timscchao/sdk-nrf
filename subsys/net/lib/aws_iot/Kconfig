@@ -45,6 +45,10 @@ config AWS_IOT_STATIC_IPV4_ADDR
 config AWS_IOT_SEC_TAG
 	int "Security tag to use for AWS IoT connection"
 
+config AWS_IOT_SEC_TAG_LIST_COUNT
+	int "Maximum number of secutity tags support to use for AWS IoT connection"
+	default 3
+
 config AWS_IOT_BROKER_HOST_NAME
 	string "AWS IoT server hostname"
 	default ""
