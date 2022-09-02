@@ -78,7 +78,9 @@ static int set_color_all_channels(struct led *led, struct led_color *color)
 	int err = 0;
 
 	for (size_t i = 0; (i < ARRAY_SIZE(color->c)) && !err; i++) {
-		err = led_set_brightness(led->dev, i, color->c[i]);
+		if (i < led->color_count) {
+			err = led_set_brightness(led->dev, i, color->c[i]);
+		}
 	}
 
 	return err;
@@ -88,7 +90,7 @@ static void set_color(struct led *led, struct led_color *color)
 {
 	int err;
 
-	if (led->color_count == ARRAY_SIZE(color->c)) {
+	if (led->color_count > 1) {
 		err = set_color_all_channels(led, color);
 	} else {
 		err = set_color_one_channel(led, color);
@@ -183,7 +185,7 @@ static int leds_init(void)
 	for (size_t i = 0; (i < ARRAY_SIZE(leds)) && !err; i++) {
 		struct led *led = &leds[i];
 
-		__ASSERT_NO_MSG((led->color_count == 1) || (led->color_count == 3));
+		__ASSERT_NO_MSG((led->color_count >= 1) && (led->color_count <= _CAF_LED_COLOR_CHANNEL_COUNT));
 
 		if (!device_is_ready(led->dev)) {
 			LOG_ERR("Device %s is not ready", led->dev->name);
