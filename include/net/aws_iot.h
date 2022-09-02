@@ -180,6 +180,14 @@ typedef void (*aws_iot_evt_handler_t)(const struct aws_iot_evt *evt);
 struct aws_iot_config {
 	/** Socket for AWS IoT broker connection */
 	int socket;
+	/**
+	 * 	Broker host name (endpoint) for AWS IoT, used whe
+	 *  @kconfig{CONFIG_AWS_IOT_BROKER_HOST_NAME_APP} is set. If not set an
+	 *  internal configurable static host name is used.
+	 */
+	char *broker_host;
+	/** Length of broker_host string. */
+	size_t broker_host_len;
 	/** Client id for AWS IoT broker connection, used when
 	 *  @kconfig{CONFIG_AWS_IOT_CLIENT_ID_APP} is set. If not set an internal
 	 *  configurable static client id is used.

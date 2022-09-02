@@ -21,8 +21,10 @@
 
 LOG_MODULE_REGISTER(aws_iot, CONFIG_AWS_IOT_LOG_LEVEL);
 
+#if !defined(CONFIG_AWS_IOT_BROKER_HOST_NAME_APP)
 BUILD_ASSERT(sizeof(CONFIG_AWS_IOT_BROKER_HOST_NAME) > 1,
 	    "AWS IoT hostname not set");
+#endif
 
 /* Check that the client ID buffer is large enough if a static ID is used. */
 #if !defined(CONFIG_AWS_IOT_CLIENT_ID_APP)
@@ -51,6 +53,9 @@ BUILD_ASSERT(CONFIG_AWS_IOT_SHADOW_NAME_MAX_LEN >=
 #define AWS_CLIENT_ID_PREFIX "%s"
 #define AWS_CLIENT_ID_LEN_MAX CONFIG_AWS_IOT_CLIENT_ID_MAX_LEN
 
+#define AWS_ENDPOINT "%s"
+#define AWS_ENDPOINT_LEN_MAX CONFIG_AWS_IOT_BROKER_HOST_NAME_MAX_LEN
+
 #define AWS_SHADOW_NAME "/name/%s"
 #define AWS_SHADOW_NAME_LEN_MAX (CONFIG_AWS_IOT_SHADOW_NAME_MAX_LEN + 6)
 
@@ -63,6 +68,7 @@ BUILD_ASSERT(CONFIG_AWS_IOT_SHADOW_NAME_MAX_LEN >=
 #define DELETE_TOPIC AWS_TOPIC "%s/shadow%s/delete"
 #define DELETE_TOPIC_LEN (AWS_TOPIC_LEN + AWS_CLIENT_ID_LEN_MAX + AWS_SHADOW_NAME_LEN_MAX + 14)
 
+static char endpoint_buf[AWS_ENDPOINT_LEN_MAX + 1];
 static char client_id_buf[AWS_CLIENT_ID_LEN_MAX + 1];
 static char shadow_name_buf[AWS_SHADOW_NAME_LEN_MAX + 1];
 static char get_topic[GET_TOPIC_LEN + 1];
@@ -226,6 +232,31 @@ static void aws_fota_cb_handler(struct aws_fota_event *fota_evt)
 	aws_iot_notify_event(&aws_iot_evt);
 }
 #endif
+
+static int aws_iot_endpoint_populate(char *const host, size_t host_len)
+{
+	int err;
+
+#if defined(CONFIG_AWS_IOT_BROKER_HOST_NAME_APP)
+	err = snprintf(endpoint_buf, sizeof(endpoint_buf), AWS_ENDPOINT, host);
+	if (err <= 0) {
+		return -EINVAL;
+	}
+	if (err >= sizeof(endpoint_buf)) {
+		return -ENOMEM;
+	}
+#else
+	err = snprintf(endpoint_buf, sizeof(endpoint_buf), AWS_ENDPOINT,
+		       CONFIG_AWS_IOT_BROKER_HOST_NAME);
+	if (err <= 0) {
+		return -EINVAL;
+	}
+	if (err >= sizeof(endpoint_buf)) {
+		return -ENOMEM;
+	}
+#endif
+	return 0;
+}
 
 static int aws_iot_topics_populate(
 	char *const id, size_t id_len, char *const shadow, size_t shadow_len)
@@ -775,8 +806,7 @@ static int broker_init(void)
 		.ai_socktype = SOCK_STREAM
 	};
 
-	err = getaddrinfo(CONFIG_AWS_IOT_BROKER_HOST_NAME,
-			  NULL, &hints, &result);
+	err = getaddrinfo(endpoint_buf, NULL, &hints, &result);
 	if (err) {
 		LOG_ERR("getaddrinfo, error %d", err);
 		return -ECHILD;
@@ -883,7 +913,7 @@ static int client_broker_init(struct mqtt_client *const client)
 	tls_cfg->cipher_list		= NULL;
 	tls_cfg->sec_tag_count		= ARRAY_SIZE(sec_tag_list);
 	tls_cfg->sec_tag_list		= sec_tag_list;
-	tls_cfg->hostname		= CONFIG_AWS_IOT_BROKER_HOST_NAME;
+	tls_cfg->hostname		= endpoint_buf;
 	tls_cfg->session_cache = TLS_SESSION_CACHE_DISABLED;
 
 #if defined(CONFIG_AWS_IOT_PROVISION_CERTIFICATES)
@@ -1098,7 +1128,9 @@ int aws_iot_init(const struct aws_iot_config *const config,
 {
 	int err;
 
-	if ((IS_ENABLED(CONFIG_AWS_IOT_CLIENT_ID_APP) || IS_ENABLED(CONFIG_AWS_IOT_SHADOW_NAME_APP)) &&
+	if ((IS_ENABLED(CONFIG_AWS_IOT_CLIENT_ID_APP) ||
+	     IS_ENABLED(CONFIG_AWS_IOT_SHADOW_NAME_APP) ||
+	     IS_ENABLED(CONFIG_AWS_IOT_BROKER_HOST_NAME_APP)) &&
 	    config == NULL) {
 		LOG_ERR("config is NULL");
 		return -EINVAL;
@@ -1128,14 +1160,40 @@ int aws_iot_init(const struct aws_iot_config *const config,
 		return -ENODATA;
 	}
 
-	if (IS_ENABLED(CONFIG_AWS_IOT_CLIENT_ID_APP) || IS_ENABLED(CONFIG_AWS_IOT_SHADOW_NAME_APP)) {
-		err = aws_iot_topics_populate(config->client_id, config->client_id_len, config->shadow_name, config->shadown_name_len);
+	if (IS_ENABLED(CONFIG_AWS_IOT_CLIENT_ID_APP) ||
+	    IS_ENABLED(CONFIG_AWS_IOT_SHADOW_NAME_APP)) {
+		err = aws_iot_topics_populate(
+			config->client_id, config->client_id_len,
+			config->shadow_name, config->shadow_name_len);
 	} else {
 		err = aws_iot_topics_populate(NULL, 0, NULL, 0);
 	}
 
 	if (err) {
 		LOG_ERR("aws_topics_populate, error: %d", err);
+		return err;
+	}
+
+	if (IS_ENABLED(CONFIG_AWS_IOT_BROKER_NAME_APP) &&
+	    config->broker_host_len >= CONFIG_AWS_IOT_BROKER_HOST_NAME_MAX_LEN) {
+		LOG_ERR("Broker host name string too long");
+		return -EMSGSIZE;
+	}
+
+	if (IS_ENABLED(CONFIG_AWS_IOT_BROKER_NAME_APP) &&
+	    config->broker_host == NULL) {
+		LOG_ERR("Broker host name not set in application");
+		return -ENODATA;
+	}
+
+	if (IS_ENABLED(CONFIG_AWS_IOT_BROKER_HOST_NAME_APP)) {
+		err = aws_iot_endpoint_populate(config->broker_host, config->broker_host_len);
+	} else {
+		err = aws_iot_endpoint_populate(NULL, 0);
+	}
+
+	if (err) {
+		LOG_ERR("aws_iot_endpoint_populate, error: %d", err);
 		return err;
 	}
 
