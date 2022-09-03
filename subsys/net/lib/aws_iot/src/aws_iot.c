@@ -120,6 +120,8 @@ static char delete_rejected_topic[DELETE_REJECTED_TOPIC_LEN + 1];
 static sec_tag_t sec_tag_list[CONFIG_AWS_IOT_SEC_TAG_LIST_COUNT] = { CONFIG_AWS_IOT_SEC_TAG };
 static uint32_t sec_tag_count = 1;
 
+static uint16_t keepalive = CONFIG_MQTT_KEEPALIVE;
+
 /* Empty string used to request the AWS IoT shadow document. */
 #define AWS_IOT_SHADOW_REQUEST_STRING ""
 
@@ -265,6 +267,7 @@ static int aws_iot_topics_populate(
 	char *const id, size_t id_len, char *const shadow, size_t shadow_len)
 {
 	int err;
+
 #if defined(CONFIG_AWS_IOT_CLIENT_ID_APP)
 	err = snprintf(client_id_buf, sizeof(client_id_buf),
 		       AWS_CLIENT_ID_PREFIX, id);
@@ -906,6 +909,7 @@ static int client_broker_init(struct mqtt_client *const client)
 	client->tx_buf			= tx_buffer;
 	client->tx_buf_size		= sizeof(tx_buffer);
 	client->transport.type		= MQTT_TRANSPORT_SECURE;
+	client->keepalive =		keepalive;
 
 #if defined(CONFIG_AWS_IOT_LAST_WILL)
 	static struct mqtt_topic last_will_topic = {
@@ -1214,11 +1218,18 @@ int aws_iot_init(const struct aws_iot_config *const config,
 		return err;
 	}
 
-	err = aws_iot_sec_tag_list_populate(config->sec_tag_list, config->sec_tag_count);
+	if (config != NULL) {
+		err = aws_iot_sec_tag_list_populate(config->sec_tag_list, config->sec_tag_count);
 
-	if (err) {
-		LOG_ERR("aws_iot_sec_tag_list_populate, error: %d", err);
-		return err;
+		if (err) {
+			LOG_ERR("aws_iot_sec_tag_list_populate, error: %d", err);
+			return err;
+		}
+
+		if (config->keepalive != NULL) {
+			/* maximum allow value for aws iot is 1200 */
+			keepalive = MIN(*config->keepalive, 1200);
+		}
 	}
 
 #if defined(CONFIG_AWS_FOTA)

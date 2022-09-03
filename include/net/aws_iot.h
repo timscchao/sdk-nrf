@@ -208,6 +208,10 @@ struct aws_iot_config {
 	sec_tag_t *sec_tag_list;
 	/** Tag count of sec_tag_list */
 	uint32_t sec_tag_count;
+	/** Pointer to hold MQTT keepalive (in seconds) value.
+	 *  If not set, the @kconfig{CONFIG_MQTT_KEEPALIVE} is used.
+	 */
+	uint16_t *keepalive;
 };
 
 /** @brief Initialize the module.
