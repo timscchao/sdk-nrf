@@ -10,6 +10,7 @@
 #include <zephyr/pm/device.h>
 
 #include <caf/events/sensor_event.h>
+#include <caf/events/sensor_ctrl_event.h>
 #include <caf/sensor_manager.h>
 
 #include CONFIG_CAF_SENSOR_MANAGER_DEF_PATH
@@ -515,6 +516,55 @@ static bool handle_wake_up_event(const struct app_event_header *aeh)
 	return false;
 }
 
+
+#if CONFIG_CAF_SENSOR_CTRL_EVENTS
+static bool handle_sensor_ctrl_event(const struct app_event_header *aeh)
+{
+	const struct sensor_ctrl_event *event = cast_sensor_ctrl_event(aeh);
+
+	switch (event->cmd) {
+	case SENSOR_CTRL_CMD_CHANGE_SAMPLING_PERIOD:
+		for (int i = 0; i < ARRAY_SIZE(sensor_data); i++) {
+			if (!strcmp(event->descr, sensor_configs[i].event_descr)) {
+				if (event->dyndata.size !=
+				    sizeof(sensor_data[i].sampling_period)) {
+					LOG_ERR("sampling_period data size not match");
+					break;
+				}
+				memcpy(&sensor_data[i].sampling_period,
+				       event->dyndata.data,
+				       event->dyndata.size);
+				LOG_DBG("change %s sampling_period to %d",
+					event->descr, sensor_data[i].sampling_period);
+				break;
+			}
+		}
+		break;
+
+	case SENSOR_CTRL_CMD_TRIGGER_SAMPLING:
+		for (int i = 0; i < ARRAY_SIZE(sensor_data); i++) {
+			if (!strcmp(event->descr, "all") ||
+			    !strcmp(event->descr, sensor_configs[i].event_descr)) {
+				const struct sm_sensor_config *sc = &sensor_configs[i];
+				struct sensor_data *sd = &sensor_data[i];
+
+				sensor_wake_up_post(sc, sd);
+
+				if (IS_ENABLED(CONFIG_CAF_SENSOR_MANAGER_ACTIVE_PM)) {
+					APP_EVENT_SUBMIT(new_wake_up_event());
+				}
+
+				LOG_DBG("trigger %s sampling", sc->event_descr);
+			}
+		}
+		k_sem_give(&can_sample);
+		break;
+	}
+
+	return false;
+}
+#endif
+
 static bool app_event_handler(const struct app_event_header *aeh)
 {
 	if (is_module_state_event(aeh)) {
@@ -555,6 +605,10 @@ static bool app_event_handler(const struct app_event_header *aeh)
 		return handle_wake_up_event(aeh);
 	}
 
+	if (IS_ENABLED(CONFIG_CAF_SENSOR_CTRL_EVENTS) && is_sensor_ctrl_event(aeh)) {
+		return handle_sensor_ctrl_event(aeh);
+	}
+
 	/* If event is unhandled, unsubscribe. */
 	__ASSERT_NO_MSG(false);
 
@@ -564,6 +618,9 @@ static bool app_event_handler(const struct app_event_header *aeh)
 APP_EVENT_LISTENER(MODULE, app_event_handler);
 APP_EVENT_SUBSCRIBE(MODULE, module_state_event);
 APP_EVENT_SUBSCRIBE_FINAL(MODULE, sensor_event);
+#if CONFIG_CAF_SENSOR_CTRL_EVENTS
+APP_EVENT_SUBSCRIBE(MODULE, sensor_ctrl_event);
+#endif
 #if CONFIG_CAF_SENSOR_MANAGER_PM
 APP_EVENT_SUBSCRIBE(MODULE, power_down_event);
 APP_EVENT_SUBSCRIBE(MODULE, wake_up_event);
