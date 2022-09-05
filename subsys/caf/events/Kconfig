@@ -135,6 +135,11 @@ config CAF_INIT_LOG_SENSOR_STATE_EVENTS
 	help
 	  Log sensor state events, used to notify about sensor state change.
 
+config CAF_SENSOR_CTRL_EVENTS
+	bool "Enable sensor control events"
+	help
+	  Enable support for sensor control events.
+
 config CAF_NET_STATE_EVENTS
 	bool "Enable network state events"
 	help
