@@ -67,11 +67,11 @@ See `Matter samples`_ for the list of changes for the Matter samples.
 Matter fork
 +++++++++++
 
-The Matter fork in the |NCS| (``sdk-connectedhomeip``) contains all commits from the upstream Matter repository up to, and including, ``708685f4821df2aa0304f02db2773c429ad25eb8``.
+The Matter fork in the |NCS| (``sdk-connectedhomeip``) contains all commits from the upstream Matter repository up to, and including, ``561d23d0db215a99705ff0696e73853c8edf11b2``.
 
 The following list summarizes the most important changes inherited from the upstream Matter:
 
-* |no_changes_yet_note|
+|no_changes_yet_note|
 
 Thread
 ------
@@ -337,6 +337,6 @@ cJSON
 Documentation
 =============
 
-* |no_changes_yet_note|
+* Updated :ref:`ug_matter_gs_adding_cluster` documentation with new code snippets to align it with the source code of refactored Matter template sample.
 
 .. |no_changes_yet_note| replace:: No changes since the latest |NCS| release.
