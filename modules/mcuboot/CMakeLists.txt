@@ -169,6 +169,7 @@ if(CONFIG_BOOTLOADER_MCUBOOT)
       COMMAND
       # Sign the binary version of the input hex file.
       ${sign_cmd}
+      ${enc_args}
       ${sign_dependencies}
       ${SIGN_ARG_ROM_FIXED}
       --slot-size ${SIGN_ARG_SLOT_SIZE}
@@ -311,6 +312,18 @@ if(CONFIG_BOOTLOADER_MCUBOOT)
   elseif (DEFINED mcuboot_CONF_DIR)
     if (EXISTS ${mcuboot_CONF_DIR}/${CONFIG_BOOT_SIGNATURE_KEY_FILE})
       set(mcuboot_key_file ${mcuboot_CONF_DIR}/${CONFIG_BOOT_SIGNATURE_KEY_FILE})
+    endif()
+  endif()
+
+  if (NOT DEFINED CONFIG_BOOT_ENCRYPTION_KEY_FILE)
+    get_shared(mcuboot_enc_key_file IMAGE mcuboot PROPERTY ENCRYPTION_KEY_FILE)
+    set(CONFIG_BOOT_ENCRYPTION_KEY_FILE ${mcuboot_enc_key_file})
+    if (DEFINED CONFIG_BOOT_ENCRYPTION_KEY_FILE AND NOT CONFIG_BOOT_ENCRYPTION_KEY_FILE STREQUAL "")
+      if (IS_ABSOLUTE ${CONFIG_BOOT_ENCRYPTION_KEY_FILE})
+        set(enc_args --encrypt ${CONFIG_BOOT_ENCRYPTION_KEY_FILE})
+      else()
+        set(enc_args --encrypt ${mcuboot_CONF_DIR}/${CONFIG_BOOT_ENCRYPTION_KEY_FILE})
+      endif()
     endif()
   endif()
 
