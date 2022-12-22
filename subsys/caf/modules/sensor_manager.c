@@ -534,7 +534,10 @@ static bool handle_set_sensor_period_event(const struct app_event_header *aeh)
 		if (event->descr == sc->event_descr) {
 			struct sensor_data *sd = &sensor_data[i];
 
-			sd->sampling_period = event->sampling_period;
+			// INGICS hack: 0 for trigger sampling once
+			if (event->sampling_period != 0) {
+				sd->sampling_period = event->sampling_period;
+			}
 			sd->sample_timeout = k_uptime_get() + event->sampling_period;
 			if (sd->state == SENSOR_STATE_ACTIVE) {
 				k_sem_give(&can_sample);
