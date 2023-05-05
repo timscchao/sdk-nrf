@@ -1073,6 +1073,17 @@ int lte_lc_edrx_param_set(enum lte_lc_lte_mode mode, const char *edrx);
  */
 int lte_lc_edrx_req(bool enable);
 
+/**
+ * @brief Function for getting the current eDRX configuration.
+ *
+ * @param edrx Pointer to the variable for parsed edrx value in
+ *	      seconds. Positive float, or -1 if timer is deactivated.
+ * @param ptw Pointer to the variable for parsed PTW in seconds.
+ *	              Positive gloat, or -1 if timer is deactivated.
+  * @retval 0 if successful.
+ */
+int lte_lc_edrx_get(float *edrx, float *ptw);
+
 /** @brief Function for setting modem RAI value to be used when
  *         RAI is subsequently enabled using `lte_lc_rai_req`.
  *         For reference see 3GPP 24.301 Ch. 9.9.4.25.
