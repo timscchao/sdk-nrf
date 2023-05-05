@@ -1078,6 +1078,39 @@ int lte_lc_edrx_req(bool enable)
 	return 0;
 }
 
+int lte_lc_edrx_get(float *edrx, float *ptw)
+{
+	int err;
+	struct lte_lc_edrx_cfg cfg;
+	static char response[80] = { 0 };
+
+	response[0] = '\0';
+
+	err = nrf_modem_at_cmd(response, sizeof(response), "AT+CEDRXRDP");
+	if (err) {
+		LOG_ERR("AT command failed, error: %d", err);
+		return -EFAULT;
+	}
+
+	if (strncmp(response, "+CEDRXRDP: 0", strlen("+CEDRXRDP: 0")) == 0) {
+		// eDRX disabled
+		*edrx = -1;
+		*ptw = -1;
+		return 0;
+	}
+
+	err = parse_edrx(response, &cfg);
+	if (err) {
+		LOG_ERR("Can't parse eDRX, error: %d", err);
+		return err;
+	}
+
+	*edrx = cfg.edrx;
+	*ptw = cfg.ptw;
+
+	return 0;
+}
+
 int lte_lc_rai_req(bool enable)
 {
 	int err;
