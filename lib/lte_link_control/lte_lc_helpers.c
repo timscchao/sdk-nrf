@@ -365,13 +365,25 @@ int parse_edrx(const char *at_response, struct lte_lc_edrx_cfg *cfg)
 
 	tmp_buf[len] = '\0';
 
-	/* The eDRX value is a multiple of 10.24 seconds, except for the
-	 * special case of idx == 0 for LTE-M, where the value is 5.12 seconds.
-	 * The variable idx is used to map to the entry of index idx in
-	 * Figure 10.5.5.32/3GPP TS 24.008, table for eDRX in S1 mode, and
-	 * note 4 and 5 are taken into account.
-	 */
-	idx = strtoul(tmp_buf, NULL, 2);
+	if (strlen(tmp_buf) > 0) {
+		/* The eDRX value is a multiple of 10.24 seconds, except for the
+		* special case of idx == 0 for LTE-M, where the value is 5.12 seconds.
+		* The variable idx is used to map to the entry of index idx in
+		* Figure 10.5.5.32/3GPP TS 24.008, table for eDRX in S1 mode, and
+		* note 4 and 5 are taken into account.
+		*/
+		idx = strtoul(tmp_buf, NULL, 2);
+
+		err = get_edrx_value(cfg->mode, idx, &cfg->edrx);
+		if (err) {
+			LOG_ERR("Failed to get eDRX value, error; %d", err);
+			goto clean_exit;
+		}
+	} else {
+		cfg->edrx = 0;
+	}
+
+	len = sizeof(tmp_buf) - 1;
 
 	/* Confirm valid system mode and set Paging Time Window multiplier.
 	 * Multiplier is 1.28 s for LTE-M, and 2.56 s for NB-IoT, derived from
@@ -383,14 +395,6 @@ int parse_edrx(const char *at_response, struct lte_lc_edrx_cfg *cfg)
 		goto clean_exit;
 	}
 
-	err = get_edrx_value(cfg->mode, idx, &cfg->edrx);
-	if (err) {
-		LOG_ERR("Failed to get eDRX value, error; %d", err);
-		goto clean_exit;
-	}
-
-	len = sizeof(tmp_buf) - 1;
-
 	err = at_params_string_get(&resp_list, AT_CEDRXP_NW_PTW_INDEX,
 				   tmp_buf, &len);
 	if (err) {
@@ -400,22 +404,27 @@ int parse_edrx(const char *at_response, struct lte_lc_edrx_cfg *cfg)
 
 	tmp_buf[len] = '\0';
 
-	/* Value can be a maximum of 15, as there are 16 entries in the table
-	 * for paging time window (both for LTE-M and NB1).
-	 */
-	idx = strtoul(tmp_buf, NULL, 2);
-	if (idx > 15) {
-		LOG_ERR("Invalid PTW lookup index: %d", idx);
-		err = -EINVAL;
-		goto clean_exit;
-	}
+	if (strlen(tmp_buf) > 0) {
+		/* Value can be a maximum of 15, as there are 16 entries in the table
+		* for paging time window (both for LTE-M and NB1).
+		*/
+		idx = strtoul(tmp_buf, NULL, 2);
+		if (idx > 15) {
+			LOG_ERR("Invalid PTW lookup index: %d", idx);
+			err = -EINVAL;
+			goto clean_exit;
+		}
+		LOG_DBG("PTW index: %u (%s)", idx, tmp_buf);
 
-	/* The Paging Time Window is different for LTE-M and NB-IoT:
-	 *	- LTE-M: (idx + 1) * 1.28 s
-	 *	- NB-IoT (idx + 1) * 2.56 s
-	 */
-	idx += 1;
-	cfg->ptw = idx * ptw_multiplier;
+		/* The Paging Time Window is different for LTE-M and NB-IoT:
+		*	- LTE-M: (idx + 1) * 1.28 s
+		*	- NB-IoT (idx + 1) * 2.56 s
+		*/
+		idx += 1;
+		cfg->ptw = idx * ptw_multiplier;
+	} else {
+		cfg->ptw = 0;
+	}
 
 	LOG_DBG("eDRX value for %s: %d.%02d, PTW: %d.%02d",
 		(cfg->mode == LTE_LC_LTE_MODE_LTEM) ? "LTE-M" : "NB-IoT",

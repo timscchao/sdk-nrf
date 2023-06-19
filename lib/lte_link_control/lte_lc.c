@@ -1094,8 +1094,8 @@ int lte_lc_edrx_get(float *edrx, float *ptw)
 
 	if (strncmp(response, "+CEDRXRDP: 0", strlen("+CEDRXRDP: 0")) == 0) {
 		// eDRX disabled
-		*edrx = -1;
-		*ptw = -1;
+		*edrx = 0;
+		*ptw = 0;
 		return 0;
 	}
 
