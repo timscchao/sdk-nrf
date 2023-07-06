@@ -18,6 +18,7 @@
 #include <caf/events/module_state_event.h>
 #include <caf/events/ble_common_event.h>
 #include <caf/events/power_event.h>
+#include <caf/events/click_event.h>
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(MODULE, CONFIG_CAF_BLE_ADV_LOG_LEVEL);
@@ -49,6 +50,7 @@ static bool req_new_adv_session = true;
 
 static struct k_work adv_delayed_start;
 static struct k_work_delayable fast_adv_end;
+static struct k_work_delayable adv_end;
 static struct k_work_delayable grace_period_end;
 static struct k_work_delayable rpa_rotate;
 static uint8_t cur_identity = BT_ID_DEFAULT; /* We expect zero */
@@ -109,6 +111,17 @@ static void broadcast_adv_state(bool new_active)
 	APP_EVENT_SUBMIT(event);
 
 	LOG_INF("Advertising %s", (active)?("started"):("stopped"));
+
+#if CONFIG_CAF_BLE_ADV_TIMEOUT > 0
+#if CAF_BLE_ADV_FAST_ADV
+	BUILD_ASSERT(CONFIG_CAF_BLE_ADV_TIMEOUT > CONFIG_CAF_BLE_ADV_FAST_ADV_TIMEOUT);
+#endif
+	if (active && CONFIG_CAF_BLE_ADV_TIMEOUT > 0) {
+		(void)k_work_reschedule(&adv_end, K_SECONDS(CONFIG_CAF_BLE_ADV_TIMEOUT));
+	} else {
+		(void)k_work_cancel_delayable(&adv_end);
+	}
+#endif
 }
 
 static void conn_find_cb(struct bt_conn *conn, void *data)
@@ -678,6 +691,13 @@ static void fast_adv_end_fn(struct k_work *work)
 	__ASSERT_NO_MSG(!fast_adv);
 }
 
+static void adv_end_fn(struct k_work *work)
+{
+	ARG_UNUSED(work);
+
+	update_state(STATE_OFF);
+}
+
 static void rpa_rotate_fn(struct k_work *work)
 {
 	ARG_UNUSED(work);
@@ -729,6 +749,8 @@ static void init(void)
 	if (IS_ENABLED(CONFIG_CAF_BLE_ADV_GRACE_PERIOD)) {
 		k_work_init_delayable(&grace_period_end, grace_period_end_fn);
 	}
+
+	k_work_init_delayable(&adv_end, adv_end_fn);
 }
 
 static void update_peer_is_rpa(enum peer_rpa new_peer_rpa)
@@ -1032,6 +1054,21 @@ static bool handle_wake_up_event(const struct wake_up_event *event)
 	return false;
 }
 
+static bool handle_click_event(const struct click_event *event)
+{
+	if (event->key_id != CONFIG_CAF_BLE_ADV_CLICK_KEYID) {
+		return false;
+	}
+
+	if (event->click == CLICK_SHORT) {
+		req_new_adv_session = true;
+		req_fast_adv = true;
+		update_state(STATE_ACTIVE);
+	}
+
+	return false;
+}
+
 static bool app_event_handler(const struct app_event_header *aeh)
 {
 	if (is_module_state_event(aeh)) {
@@ -1061,6 +1098,11 @@ static bool app_event_handler(const struct app_event_header *aeh)
 		return handle_wake_up_event(cast_wake_up_event(aeh));
 	}
 
+	if (IS_ENABLED(CONFIG_CAF_BLE_ADV_CLICK_ON) &&
+	    is_click_event(aeh)) {
+		return handle_click_event(cast_click_event(aeh));
+	}
+
 	/* If event is unhandled, unsubscribe. */
 	__ASSERT_NO_MSG(false);
 
@@ -1077,3 +1119,6 @@ APP_EVENT_SUBSCRIBE(MODULE, ble_peer_operation_event);
 APP_EVENT_SUBSCRIBE(MODULE, power_down_event);
 APP_EVENT_SUBSCRIBE(MODULE, wake_up_event);
 #endif /* CONFIG_CAF_BLE_ADV_PM_EVENTS */
+#if CONFIG_CAF_BLE_ADV_CLICK_ON
+APP_EVENT_SUBSCRIBE(MODULE, click_event);
+#endif /* CONFIG_CAF_BLE_ADV_CLICK_ON */
