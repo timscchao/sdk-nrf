@@ -1061,9 +1061,11 @@ static bool handle_click_event(const struct click_event *event)
 	}
 
 	if (event->click == CLICK_SHORT) {
-		req_new_adv_session = true;
-		req_fast_adv = true;
-		update_state(STATE_ACTIVE);
+		if (!conn_get()) {
+			req_new_adv_session = true;
+			req_fast_adv = true;
+			update_state(STATE_ACTIVE);
+		}
 	}
 
 	return false;
