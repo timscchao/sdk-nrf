@@ -5,8 +5,11 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <date_time.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/timeutil.h>
 #include <modem/location.h>
 #include <modem/lte_lc.h>
 #include <nrf_modem_at.h>
@@ -28,6 +31,9 @@
 #include <net/nrf_cloud_coap.h>
 #endif
 
+#if defined(CONFIG_LOCATION_GNSS_MINIMAL_ASSISTANCE)
+#include <mcc_location_table.h>
+#endif
 LOG_MODULE_DECLARE(location, CONFIG_LOCATION_LOG_LEVEL);
 
 #if defined(CONFIG_NRF_CLOUD_AGNSS) || defined(CONFIG_NRF_CLOUD_PGPS)
@@ -85,13 +91,15 @@ BUILD_ASSERT(
 
 static struct k_work method_gnss_start_work;
 static struct k_work method_gnss_pvt_work;
-#if defined(CONFIG_NRF_CLOUD_AGNSS) || defined(CONFIG_NRF_CLOUD_PGPS)
+#if defined(CONFIG_NRF_CLOUD_AGNSS) || defined(CONFIG_NRF_CLOUD_PGPS) || defined(CONFIG_LOCATION_GNSS_MINIMAL_ASSISTANCE)
 /* Flag indicating whether nrf_modem_gnss_agnss_expiry_get() is supported. If the API is
  * supported, NRF_MODEM_GNSS_EVT_AGNSS_REQ events are ignored.
  */
 static bool agnss_expiry_get_supported;
 static struct k_work method_gnss_agnss_req_event_handle_work;
+#if defined(CONFIG_NRF_CLOUD_AGNSS) || defined(CONFIG_NRF_CLOUD_PGPS)
 static struct k_work method_gnss_agnss_req_work;
+#endif
 #endif
 
 #if defined(CONFIG_NRF_CLOUD_AGNSS)
@@ -118,7 +126,7 @@ static struct location_gnss_config gnss_config;
 static K_SEM_DEFINE(entered_psm_mode, 0, 1);
 static K_SEM_DEFINE(entered_rrc_idle, 1, 1);
 
-#if defined(CONFIG_NRF_CLOUD_AGNSS) || defined(CONFIG_NRF_CLOUD_PGPS)
+#if defined(CONFIG_NRF_CLOUD_AGNSS) || defined(CONFIG_NRF_CLOUD_PGPS) || defined(CONFIG_LOCATION_GNSS_MINIMAL_ASSISTANCE)
 static struct nrf_modem_gnss_agnss_data_frame agnss_request;
 #endif
 
@@ -457,6 +465,129 @@ static bool method_gnss_agnss_required(void)
 }
 #endif /* CONFIG_NRF_CLOUD_AGNSS */
 
+#if defined(CONFIG_LOCATION_GNSS_MINIMAL_ASSISTANCE)
+
+/* (6.1.1980 UTC - 1.1.1970 UTC) */
+#define GPS_TO_UNIX_UTC_OFFSET_SECONDS	(315964800UL)
+/* UTC/GPS time offset as of 1st of January 2017. */
+#define GPS_TO_UTC_LEAP_SECONDS		(18UL)
+#define SEC_PER_MIN			(60UL)
+#define MIN_PER_HOUR			(60UL)
+#define SEC_PER_HOUR			(MIN_PER_HOUR * SEC_PER_MIN)
+#define HOURS_PER_DAY			(24UL)
+#define SEC_PER_DAY			(HOURS_PER_DAY * SEC_PER_HOUR)
+#define DAYS_PER_WEEK			(7UL)
+#define PLMN_STR_MAX_LEN		8 /* MCC + MNC + quotes */
+
+static int64_t utc_to_gps_sec(const int64_t utc_sec)
+{
+	return (utc_sec - GPS_TO_UNIX_UTC_OFFSET_SECONDS) + GPS_TO_UTC_LEAP_SECONDS;
+}
+
+static void gps_sec_to_day_time(int64_t gps_sec,
+				uint16_t *gps_day,
+				uint32_t *gps_time_of_day)
+{
+	*gps_day = (uint16_t)(gps_sec / SEC_PER_DAY);
+	*gps_time_of_day = (uint32_t)(gps_sec % SEC_PER_DAY);
+}
+
+static void time_inject(void)
+{
+	int ret;
+	struct tm date_time;
+	int64_t utc_sec;
+	int64_t gps_sec;
+	struct nrf_modem_gnss_agnss_gps_data_system_time_and_sv_tow gps_time = { 0 };
+
+	/* Read current UTC time from the modem. */
+	ret = nrf_modem_at_scanf("AT+CCLK?",
+		"+CCLK: \"%u/%u/%u,%u:%u:%u",
+		&date_time.tm_year,
+		&date_time.tm_mon,
+		&date_time.tm_mday,
+		&date_time.tm_hour,
+		&date_time.tm_min,
+		&date_time.tm_sec
+	);
+	if (ret != 6) {
+		LOG_WRN("Couldn't read current time from modem, time assistance unavailable");
+		return;
+	}
+
+	/* Convert to struct tm format. */
+	date_time.tm_year = date_time.tm_year + 2000 - 1900; /* years since 1900 */
+	date_time.tm_mon--; /* months since January */
+
+	/* Convert time to seconds since Unix time epoch (1.1.1970). */
+	utc_sec = timeutil_timegm64(&date_time);
+	/* Convert time to seconds since GPS time epoch (6.1.1980). */
+	gps_sec = utc_to_gps_sec(utc_sec);
+
+	gps_sec_to_day_time(gps_sec, &gps_time.date_day, &gps_time.time_full_s);
+
+	ret = nrf_modem_gnss_agnss_write(&gps_time, sizeof(gps_time),
+					NRF_MODEM_GNSS_AGNSS_GPS_SYSTEM_CLOCK_AND_TOWS);
+	if (ret != 0) {
+		LOG_ERR("Failed to inject time, error %d", ret);
+		return;
+	}
+
+	LOG_INF("Injected time (GPS day %u, GPS time of day %u)",
+		gps_time.date_day, gps_time.time_full_s);
+}
+
+static void location_inject(void)
+{
+	int err;
+	char plmn_str[PLMN_STR_MAX_LEN + 1];
+	uint16_t mcc;
+	const struct mcc_table *mcc_info;
+	struct nrf_modem_gnss_agnss_data_location location = { 0 };
+
+	/* Read PLMN string from modem to get the MCC. */
+	err = nrf_modem_at_scanf(
+		"AT%XMONITOR",
+		"%%XMONITOR: "
+		"%*d"                                  /* <reg_status>: ignored */
+		",%*[^,]"                              /* <full_name>: ignored */
+		",%*[^,]"                              /* <short_name>: ignored */
+		",%"STRINGIFY(PLMN_STR_MAX_LEN)"[^,]", /* <plmn> */
+		plmn_str);
+	if (err != 1) {
+		LOG_WRN("Couldn't read PLMN from modem, location assistance unavailable");
+		return;
+	}
+
+	/* NULL terminate MCC and read it. */
+	plmn_str[4] = '\0';
+	mcc = strtol(plmn_str + 1, NULL, 10);
+
+	mcc_info = mcc_lookup(mcc);
+	if (mcc_info == NULL) {
+		LOG_WRN("No location found for MCC %u", mcc);
+		return;
+	}
+
+	location.latitude = lat_convert(mcc_info->lat);
+	location.longitude = lon_convert(mcc_info->lon);
+	location.unc_semimajor = mcc_info->unc_semimajor;
+	location.unc_semiminor = mcc_info->unc_semiminor;
+	location.orientation_major = mcc_info->orientation;
+	location.confidence = mcc_info->confidence;
+	location.unc_altitude = 255; /* altitude not used */
+
+	err = nrf_modem_gnss_agnss_write(
+		&location, sizeof(location), NRF_MODEM_GNSS_AGNSS_LOCATION);
+	if (err) {
+		LOG_ERR("Failed to inject location for MCC %u, error %d", mcc, err);
+		return;
+	}
+
+	LOG_INF("Injected location for MCC %u", mcc);
+}
+#endif
+
 #if defined(CONFIG_NRF_CLOUD_AGNSS) || defined(CONFIG_NRF_CLOUD_PGPS)
 static const char *get_system_string(uint8_t system_id)
 {
@@ -474,7 +605,9 @@ static const char *get_system_string(uint8_t system_id)
 		return "unknown";
 	}
 }
+#endif
 
+#if defined(CONFIG_NRF_CLOUD_AGNSS) || defined(CONFIG_NRF_CLOUD_PGPS) || defined(CONFIG_LOCATION_GNSS_MINIMAL_ASSISTANCE)
 /* Triggers A-GNSS data request and/or injection of P-GPS predictions.
  *
  * Before this function is called, the assistance data need from GNSS must be stored into
@@ -618,6 +751,22 @@ static void method_gnss_assistance_request(void)
 		}
 	}
 #endif /* CONFIG_NRF_CLOUD_PGPS */
+
+#if defined(CONFIG_LOCATION_GNSS_MINIMAL_ASSISTANCE)
+	if (!(agnss_request.data_flags & NRF_MODEM_GNSS_AGNSS_GPS_SYS_TIME_AND_SV_TOW_REQUEST) &&
+	    !(agnss_request.data_flags & NRF_MODEM_GNSS_AGNSS_POSITION_REQUEST)) {
+		LOG_INF("Ignoring assistance request because no GPS time or position is requested");
+		return;
+	    }
+
+	if (agnss_request.data_flags & NRF_MODEM_GNSS_AGNSS_GPS_SYS_TIME_AND_SV_TOW_REQUEST) {
+		time_inject();
+	}
+
+	if (agnss_request.data_flags & NRF_MODEM_GNSS_AGNSS_POSITION_REQUEST) {
+		location_inject();
+	}
+#endif /* LOCATION_GNSS_MINIMAL_ASSISTANCE */
 }
 
 static void method_gnss_agnss_req_event_handle_work_fn(struct k_work *item)
@@ -649,7 +798,7 @@ void method_gnss_event_handler(int event)
 		break;
 
 	case NRF_MODEM_GNSS_EVT_AGNSS_REQ:
-#if defined(CONFIG_NRF_CLOUD_AGNSS) || defined(CONFIG_NRF_CLOUD_PGPS)
+#if defined(CONFIG_NRF_CLOUD_AGNSS) || defined(CONFIG_NRF_CLOUD_PGPS) || defined(CONFIG_LOCATION_GNSS_MINIMAL_ASSISTANCE)
 		if (!agnss_expiry_get_supported) {
 			k_work_submit_to_queue(
 				location_core_work_queue_get(),
@@ -1291,10 +1440,12 @@ int method_gnss_init(void)
 
 	k_work_init(&method_gnss_pvt_work, method_gnss_pvt_work_fn);
 	k_work_init(&method_gnss_start_work, method_gnss_positioning_work_fn);
-#if defined(CONFIG_NRF_CLOUD_AGNSS) || defined(CONFIG_NRF_CLOUD_PGPS)
+#if defined(CONFIG_NRF_CLOUD_AGNSS) || defined(CONFIG_NRF_CLOUD_PGPS)  || defined(CONFIG_LOCATION_GNSS_MINIMAL_ASSISTANCE)
 	k_work_init(&method_gnss_agnss_req_event_handle_work,
 		    method_gnss_agnss_req_event_handle_work_fn);
+#if defined(CONFIG_NRF_CLOUD_AGPS) || defined(CONFIG_NRF_CLOUD_PGPS)
 	k_work_init(&method_gnss_agnss_req_work, method_gnss_agnss_req_work_fn);
+#endif
 #endif
 
 #if defined(CONFIG_NRF_CLOUD_PGPS)
@@ -1315,7 +1466,7 @@ int method_gnss_init(void)
 #endif
 	lte_lc_register_handler(method_gnss_lte_ind_handler);
 
-#if !defined(CONFIG_LOCATION_METHOD_CELLULAR)
+#if !defined(CONFIG_LOCATION_METHOD_CELLULAR) && defined(CONFIG_NRF_CLOUD_AGNSS)
 	/* Cellular location method is disabled, but GNSS method uses the cellular scan
 	 * functionality for A-GNSS request. The module needs to be initialized explicitly, because
 	 * init is not called by core.
