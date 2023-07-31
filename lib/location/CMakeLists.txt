@@ -12,6 +12,9 @@ zephyr_library_sources_ifdef(CONFIG_LOCATION_METHOD_GNSS method_gnss.c)
 zephyr_library_sources_ifdef(CONFIG_LOCATION_METHOD_CELLULAR scan_cellular.c)
 zephyr_library_sources_ifdef(CONFIG_LOCATION_METHOD_WIFI scan_wifi.c)
 
+zephyr_include_directories(${NRF_DIR}/samples/nrf9160/gnss/src)
+zephyr_library_sources_ifdef(CONFIG_LOCATION_GNSS_MINIMAL_ASSISTANCE ${NRF_DIR}/samples/nrf9160/gnss/src/mcc_location_table.c)
+
 if(CONFIG_LOCATION_METHOD_CELLULAR OR CONFIG_LOCATION_METHOD_WIFI)
 zephyr_library_sources(method_cloud_location.c)
 add_subdirectory(cloud_service)

@@ -246,6 +246,10 @@ choice LOCATION_REQUEST_DEFAULT_GNSS_ACCURACY
 	config LOCATION_REQUEST_DEFAULT_GNSS_ACCURACY_HIGH
 		bool "GNSS high accuracy"
 
+config LOCATION_GNSS_MINIMAL_ASSISTANCE
+	bool "Enable minial assistance for GNSS method without external service"
+	depends on !LOCATION_SERVICE_EXTERNAL
+
 endchoice
 
 config LOCATION_REQUEST_DEFAULT_GNSS_NUM_CONSECUTIVE_FIXES
