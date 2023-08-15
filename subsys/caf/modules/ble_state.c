@@ -334,7 +334,7 @@ static bool le_param_req(struct bt_conn *conn, struct bt_le_conn_param *param)
 
 	APP_EVENT_SUBMIT(event);
 
-	return true;
+	return false;
 }
 
 static void le_param_updated(struct bt_conn *conn, uint16_t interval,
