@@ -178,7 +178,8 @@ static int socket_sectag_set(int fd, const int * const sec_tag_list, uint8_t sec
 		REQUIRED = 2,
 	};
 
-	verify = REQUIRED;
+	// verify = REQUIRED;
+	verify = NONE;
 
 	err = setsockopt(fd, SOL_TLS, TLS_PEER_VERIFY, &verify, sizeof(verify));
 	if (err) {
