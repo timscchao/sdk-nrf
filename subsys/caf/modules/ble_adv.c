@@ -1063,9 +1063,11 @@ static bool handle_wake_up_event(const struct wake_up_event *event)
 
 static bool handle_click_event(const struct click_event *event)
 {
+#if CONFIG_CAF_BLE_ADV_TIMEOUT > 0
 	if (event->key_id != CONFIG_CAF_BLE_ADV_CLICK_KEYID) {
 		return false;
 	}
+#endif
 
 	if (event->click == CLICK_SHORT) {
 		if (!conn_get()) {
