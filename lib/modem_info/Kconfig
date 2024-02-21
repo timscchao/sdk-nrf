@@ -68,4 +68,10 @@ config MODEM_INFO_ADD_DEVICE
 	help
 	  Add the device information to outgoing deviceInfo device messages.
 
+config MODEM_INFO_RSRP_WITH_RSRQ
+	bool "Include RSRQ in the RSRP register callback"
+	default n
+	help
+	  Include RSRQ in the RSRP register callback.
+
 endif # MODEM_INFO

@@ -53,7 +53,11 @@ extern "C" {
 			      RSRQ_OFFSET_VAL)
 
 /**@brief RSRP event handler function prototype. */
+#if CONFIG_MODEM_INFO_RSRP_WITH_RSRQ
+typedef void (*rsrp_cb_t)(char rsrp_value, char rsrq_value);
+#else
 typedef void (*rsrp_cb_t)(char rsrp_value);
+#endif
 
 /**@brief LTE link information data. */
 enum modem_info {

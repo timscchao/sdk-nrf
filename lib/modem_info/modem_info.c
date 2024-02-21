@@ -710,6 +710,9 @@ static void modem_info_rsrp_subscribe_handler(const char *notif)
 {
 	int err;
 	uint16_t param_value;
+#if CONFIG_MODEM_INFO_RSRP_WITH_RSRQ
+	uint16_t rsrq_value;
+#endif
 
 	const struct modem_info_data rsrp_notify_data = {
 		.cmd		= AT_CMD_CESQ,
@@ -734,7 +737,19 @@ static void modem_info_rsrp_subscribe_handler(const char *notif)
 		return;
 	}
 
+#if CONFIG_MODEM_INFO_RSRP_WITH_RSRQ
+	err = at_params_unsigned_short_get(&m_param_list,
+					   rsrp_notify_data.param_index + 2,
+					   &rsrq_value);
+	if (err != 0) {
+		LOG_ERR("Failed to obtain RSRQ value, %d", err);
+		return;
+	}
+
+	modem_info_rsrp_cb(param_value, rsrq_value);
+#else
 	modem_info_rsrp_cb(param_value);
+#endif
 }
 
 int modem_info_rsrp_register(rsrp_cb_t cb)
