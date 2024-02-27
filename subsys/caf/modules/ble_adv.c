@@ -878,11 +878,16 @@ static bool handle_ble_peer_event(const struct ble_peer_event *event)
 {
 	switch (event->state) {
 	case PEER_STATE_CONNECTED:
+#if CONFIG_CAF_BLE_ADV_TIMEOUT > 0
+		/* with ADV timeout, adv will stop after connect */
+		update_state(STATE_OFF);
+#else
 		if (IS_ENABLED(CONFIG_CAF_BLE_ADV_GRACE_PERIOD) && (state == STATE_GRACE_PERIOD)) {
 			req_wakeup = true;
 		}
 
 		update_state(STATE_IDLE);
+#endif
 		break;
 
 	case PEER_STATE_SECURED:
