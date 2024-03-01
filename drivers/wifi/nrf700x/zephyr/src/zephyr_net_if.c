@@ -510,7 +510,7 @@ int nrf_wifi_if_start_zep(const struct device *dev)
 			__func__,
 			net_sprint_ll_addr(mac_addr,
 					   mac_addr_len));
-		goto dev_rem;
+		goto del_vif;
 	}
 
 	status = nrf_wifi_fmac_set_vif_macaddr(rpu_ctx_zep->rpu_ctx,
@@ -520,7 +520,7 @@ int nrf_wifi_if_start_zep(const struct device *dev)
 	if (status != NRF_WIFI_STATUS_SUCCESS) {
 		LOG_ERR("%s: MAC address change failed\n",
 			__func__);
-		goto dev_rem;
+		goto del_vif;
 	}
 
 	memset(&vif_info,
@@ -540,7 +540,7 @@ int nrf_wifi_if_start_zep(const struct device *dev)
 	if (status != NRF_WIFI_STATUS_SUCCESS) {
 		LOG_ERR("%s: nrf_wifi_fmac_chg_vif_state failed\n",
 			__func__);
-		goto dev_rem;
+		goto del_vif;
 	}
 
 #ifdef CONFIG_NRF700X_STA_MODE
@@ -562,6 +562,12 @@ int nrf_wifi_if_start_zep(const struct device *dev)
 	vif_ctx_zep->if_op_state = NRF_WIFI_FMAC_IF_OP_STATE_UP;
 
 	return 0;
+del_vif:
+	status = nrf_wifi_fmac_del_vif(rpu_ctx_zep->rpu_ctx, vif_ctx_zep->vif_idx);
+	if (status != NRF_WIFI_STATUS_SUCCESS) {
+		LOG_ERR("%s: nrf_wifi_fmac_del_vif failed",
+			__func__);
+	}
 dev_rem:
 	/* Free only if we added above i.e., for 1st VIF */
 	if (fmac_dev_added) {
@@ -661,8 +667,6 @@ int nrf_wifi_if_set_config_zep(const struct device *dev,
 			       const struct ethernet_config *config)
 {
 	struct nrf_wifi_vif_ctx_zep *vif_ctx_zep = NULL;
-	struct nrf_wifi_ctx_zep *rpu_ctx_zep = vif_ctx_zep->rpu_ctx_zep;
-	struct nrf_wifi_fmac_dev_ctx *fmac_dev_ctx = NULL;
 	int ret = -1;
 
 	if (!dev) {
@@ -679,29 +683,10 @@ int nrf_wifi_if_set_config_zep(const struct device *dev,
 		goto out;
 	}
 
-	rpu_ctx_zep = vif_ctx_zep->rpu_ctx_zep;
-
-	if (!rpu_ctx_zep) {
-		LOG_ERR("%s: rpu_ctx_zep is NULL\n",
-			__func__);
-		goto out;
-	}
-
-	fmac_dev_ctx = rpu_ctx_zep->rpu_ctx;
-
-	if (!fmac_dev_ctx) {
-		LOG_ERR("%s: fmac_dev_ctx is NULL\n",
-			__func__);
-		goto out;
-	}
-
 	if (type == ETHERNET_CONFIG_TYPE_MAC_ADDRESS) {
-		if (!nrf_wifi_utils_is_mac_addr_valid(fmac_dev_ctx->fpriv->opriv,
-						      config->mac_address.addr)) {
-			LOG_ERR("%s: Invalid MAC address %s\n",
-				__func__,
-				net_sprint_ll_addr(config->mac_address.addr,
-						   sizeof(config->mac_address.addr)));
+		if (!net_eth_is_addr_valid((struct net_eth_addr *)&config->mac_address)) {
+			LOG_ERR("%s: Invalid MAC address\n",
+				__func__);
 			goto out;
 		}
 

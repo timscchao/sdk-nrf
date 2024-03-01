@@ -49,7 +49,7 @@ struct nrf_wifi_drv_priv_zep rpu_drv_priv_zep;
 #define MAX_RX_QUEUES 3
 
 #define MAX_TX_FRAME_SIZE \
-	(CONFIG_NRF700X_TX_MAX_DATA_SIZE + TX_BUF_HEADROOM)
+	(CONFIG_NRF_WIFI_IFACE_MTU + NRF_WIFI_FMAC_ETH_HDR_LEN + TX_BUF_HEADROOM)
 #define TOTAL_TX_SIZE \
 	(CONFIG_NRF700X_MAX_TX_TOKENS * CONFIG_NRF700X_TX_MAX_DATA_SIZE)
 #define TOTAL_RX_SIZE \
@@ -63,6 +63,9 @@ BUILD_ASSERT(CONFIG_NRF700X_RX_NUM_BUFS >= 1,
 	"At least one RX buffer is required");
 BUILD_ASSERT(RPU_PKTRAM_SIZE - TOTAL_RX_SIZE >= TOTAL_TX_SIZE,
 	"Packet RAM overflow: not enough memory for TX");
+
+BUILD_ASSERT(CONFIG_NRF700X_TX_MAX_DATA_SIZE >= MAX_TX_FRAME_SIZE,
+	"TX buffer size must be at least as big as the MTU and headroom");
 
 static const unsigned char aggregation = 1;
 static const unsigned char wmm = 1;
@@ -493,11 +496,7 @@ enum nrf_wifi_status nrf_wifi_fmac_dev_add_zep(struct nrf_wifi_drv_priv_zep *drv
 	enum nrf_wifi_status status = NRF_WIFI_STATUS_FAIL;
 	struct nrf_wifi_ctx_zep *rpu_ctx_zep = NULL;
 	void *rpu_ctx = NULL;
-#if defined(CONFIG_BOARD_NRF7001)
-	enum op_band op_band = BAND_24G;
-#else /* CONFIG_BOARD_NRF7001 */
-	enum op_band op_band = BAND_ALL;
-#endif /* CONFIG_BOARD_NRF7001 */
+	enum op_band op_band = CONFIG_NRF_WIFI_OP_BAND;
 #ifdef CONFIG_NRF_WIFI_LOW_POWER
 	int sleep_type = -1;
 
@@ -781,7 +780,7 @@ ETH_NET_DEVICE_INIT(wlan0, /* name - token */
 #endif /* !CONFIG_NRF700X_STA_MODE */
 		    CONFIG_WIFI_INIT_PRIORITY, /* prio */
 		    &wifi_offload_ops, /* api */
-		    1500); /*mtu */
+		    CONFIG_NRF_WIFI_IFACE_MTU); /*mtu */
 #else
 DEVICE_DEFINE(wlan0, /* name - token */
 	      "wlan0", /* driver name - dev->name */
