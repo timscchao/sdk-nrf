@@ -107,6 +107,25 @@ config CAF_BLE_ADV_FAST_ADV_TIMEOUT
 
 endif
 
+config CAF_BLE_ADV_TIMEOUT
+	int "Time of stop advertising [s]"
+	default 30
+	help
+	  Device will stop advertising after this time. If set to 0, advertising will not stop.
+
+if CAF_BLE_ADV_TIMEOUT > 0
+
+config CAF_BLE_ADV_CLICK_ON
+	bool "Enable re-start advertising by click event"
+	depends on CAF_CLICK_DETECTOR
+	default y
+
+config CAF_BLE_ADV_CLICK_KEYID
+	int "Key ID for re-start advertising by click event"
+	default 0
+
+endif
+
 config CAF_BLE_ADV_FILTER_ACCEPT_LIST
 	bool "Enable filter accept list"
 	select BT_FILTER_ACCEPT_LIST
